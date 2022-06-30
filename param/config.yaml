@@ -1,0 +1,17 @@
+sensor_model: VLP-16 # matters the channel (VLP-16, HDL-32E, HDL-64E)
+print_fps: true # print out fps 
+
+
+x_axis_min: -4 # area  to be excluded z min
+x_axis_max: 4 # area to be excluded z max
+y_axis_min: -3 # area  to be excluded z min
+y_axis_max: 3 # area to be excluded z max
+z_axis_min: -3 # area  to be excluded z min
+z_axis_max: 3 # area to be excluded z max
+
+x_size_marker: 0.5
+
+cluster_size_min: 3
+cluster_size_max: 2200000
+
+

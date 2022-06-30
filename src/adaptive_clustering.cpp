@@ -24,6 +24,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/crop_box.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/common.h>
 #include <pcl/common/centroid.h>
@@ -35,13 +36,22 @@ ros::Publisher cloud_filtered_pub_;
 ros::Publisher pose_array_pub_;
 ros::Publisher marker_array_pub_;
 
+// global variable
 bool print_fps_;
+float x_axis_min_;
+float x_axis_max_;
+float y_axis_min_;
+float y_axis_max_;
 float z_axis_min_;
 float z_axis_max_;
 int cluster_size_min_;
 int cluster_size_max_;
 
-const int region_max_ = 10; // Change this value to match how far you want to detect.
+float x_size_marker_;
+
+// const int region_max_ = 10; // Change this value to match how far you want to detect.
+const int region_max_ = 100000; // Change this value to match how far you want to detect.
+
 int regions_[100];
 
 int frames; clock_t start_time; bool reset = true;//fps
@@ -52,12 +62,21 @@ void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& ros_pc2_in) {
   pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_pc_in(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::fromROSMsg(*ros_pc2_in, *pcl_pc_in);
   
-  /*** Remove ground and ceiling ***/
+  /*** Remove by pass through filter ***/
   pcl::IndicesPtr pc_indices(new std::vector<int>);
-  pcl::PassThrough<pcl::PointXYZI> pt;
+  // pcl::PassThrough<pcl::PointXYZI> pt;
+  // pt.setInputCloud(pcl_pc_in);
+  // pt.setFilterFieldName("z");
+  // pt.setFilterLimits(z_axis_min_, z_axis_max_);
+  
+
+  pcl::CropBox<pcl::PointXYZI> pt;
   pt.setInputCloud(pcl_pc_in);
-  pt.setFilterFieldName("z");
-  pt.setFilterLimits(z_axis_min_, z_axis_max_);
+
+  pt.setMin(Eigen::Vector4f(x_axis_min_, y_axis_min_, z_axis_min_, 1.0));
+  pt.setMax(Eigen::Vector4f(x_axis_max_, y_axis_max_, z_axis_max_, 1.0));
+  
+  pt.setNegative(true);
   pt.filter(*pc_indices);
   
   /*** Divide the point cloud into nested circular regions ***/
@@ -195,7 +214,8 @@ void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& ros_pc2_in) {
   	marker.points.push_back(p[i]);
       }
       
-      marker.scale.x = 0.02;
+      // marker.scale.x = 0.02;
+      marker.scale.x = x_size_marker_;
       marker.color.a = 1.0;
       marker.color.r = 0.0;
       marker.color.g = 1.0;
@@ -241,11 +261,19 @@ int main(int argc, char **argv) {
   
   private_nh.param<std::string>("sensor_model", sensor_model, "VLP-16"); // VLP-16, HDL-32E, HDL-64E
   private_nh.param<bool>("print_fps", print_fps_, false);
-  private_nh.param<float>("z_axis_min", z_axis_min_, -0.8);
-  private_nh.param<float>("z_axis_max", z_axis_max_, 2.0);
+
+  private_nh.param<float>("x_axis_min", x_axis_min_, -4.0);
+  private_nh.param<float>("x_axis_max", x_axis_max_, 4.0);
+  private_nh.param<float>("y_axis_min", y_axis_min_, -3.0);
+  private_nh.param<float>("y_axis_max", y_axis_max_, 3.0);
+  private_nh.param<float>("z_axis_min", z_axis_min_, -5.0);
+  private_nh.param<float>("z_axis_max", z_axis_max_, -1.0);
+
+  private_nh.param<float>("x_size_marker", x_size_marker_, 0.5);
+
   private_nh.param<int>("cluster_size_min", cluster_size_min_, 3);
   private_nh.param<int>("cluster_size_max", cluster_size_max_, 2200000);
-  
+
   // Divide the point cloud into nested circular regions centred at the sensor.
   // For more details, see our IROS-17 paper "Online learning for human classification in 3D LiDAR-based tracking"
   if(sensor_model.compare("VLP-16") == 0) {
